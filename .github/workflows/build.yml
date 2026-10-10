@@ -1,0 +1,83 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Work out version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            echo "build_settings=MARKETING_VERSION=$version" >> "$GITHUB_OUTPUT"
+          else
+            version="$(grep -E '^\s*MARKETING_VERSION:' project.yml | sed -E 's/.*"(.*)".*/\1/')-${GITHUB_SHA::7}"
+            echo "build_settings=" >> "$GITHUB_OUTPUT"
+          fi
+          echo "name=$version" >> "$GITHUB_OUTPUT"
+
+      # Ad hoc signed: Apple Silicon won't run unsigned code, and there is no Developer ID here.
+      - name: Build
+        run: |
+          xcodebuild \
+            -project Wreckingball.xcodeproj \
+            -scheme Wreckingball \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM= \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            ${{ steps.version.outputs.build_settings }} \
+            build
+
+      - name: Check the app
+        run: |
+          app=build/Build/Products/Release/Wreckingball.app
+          lipo -archs "$app/Contents/MacOS/Wreckingball"
+          codesign --verify --verbose "$app"
+          plutil -p "$app/Contents/Info.plist" | grep -E 'CFBundleShortVersionString|CFBundleVersion'
+
+      - name: Package
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/Build/Products/Release/Wreckingball.app \
+            "Wreckingball-${{ steps.version.outputs.name }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Wreckingball-${{ steps.version.outputs.name }}
+          path: Wreckingball-${{ steps.version.outputs.name }}.zip
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "Wreckingball-${{ steps.version.outputs.name }}.zip" \
+            --title "Wreckingball ${{ steps.version.outputs.name }}" \
+            --generate-notes
