@@ -3,6 +3,8 @@ import SwiftUI
 
 struct WindowPickerView: View {
     @Environment(AppState.self) private var state
+    @State private var query = ""
+    @FocusState private var searching: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -16,18 +18,33 @@ struct WindowPickerView: View {
                     .help("Show only the background")
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.top, 10)
+            .padding(.bottom, hasWindows ? 8 : 10)
+
+            if hasWindows {
+                searchField
+            }
             Divider()
 
             if state.catalog.permissionDenied {
                 PermissionNotice()
             } else if state.catalog.windows.isEmpty {
                 ContentUnavailableView("No windows", systemImage: "macwindow", description: Text("Open a window to present it."))
+            } else if matches.isEmpty {
+                // ContentUnavailableView is sized for a whole window; in a column this narrow it
+                // ends up floating in the middle, so the message sits where the list would start.
+                Text("No windows match “\(query)”.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 20)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {
                         pinnedSection
-                        ForEach(groups, id: \.name) { group in
+                        ForEach(groups(of: matches), id: \.name) { group in
                             AppHeader(name: group.name, pid: group.windows[0].pid)
                             ForEach(group.windows) { window in
                                 WindowRow(window: window, slot: nil)
@@ -41,9 +58,59 @@ struct WindowPickerView: View {
         .background(.background.secondary)
     }
 
+    private var hasWindows: Bool {
+        !state.catalog.permissionDenied && !state.catalog.windows.isEmpty
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Search", text: $query)
+                .textFieldStyle(.plain)
+                .focused($searching)
+                .onSubmit {
+                    // Return presents the first match, so finding a window never needs the mouse.
+                    if let first = matches.first { state.select(first) }
+                }
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Clear the search")
+            }
+        }
+        .font(.callout)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(.background, in: RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(Color.primary.opacity(searching ? 0.25 : 0.1))
+        }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 10)
+    }
+
+    /// Windows matching the search, by app name and window title. Every word has to appear
+    /// somewhere, so "chrome git" narrows to the Chrome window with the repo open.
+    private var matches: [WindowInfo] {
+        let terms = query.split(whereSeparator: \.isWhitespace)
+        guard !terms.isEmpty else { return state.catalog.windows }
+        return state.catalog.windows.filter { window in
+            let text = "\(window.appName) \(window.title)"
+            return terms.allSatisfy { text.localizedStandardContains($0) }
+        }
+    }
+
+    /// Hidden while searching: the matches are the whole point of the list then.
     @ViewBuilder
     private var pinnedSection: some View {
-        if !state.pins.isEmpty {
+        if !state.pins.isEmpty, query.isEmpty {
             Label("Pinned", systemImage: "pin.fill")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
@@ -59,9 +126,9 @@ struct WindowPickerView: View {
         }
     }
 
-    private var groups: [(name: String, windows: [WindowInfo])] {
+    private func groups(of windows: [WindowInfo]) -> [(name: String, windows: [WindowInfo])] {
         var result: [(name: String, windows: [WindowInfo])] = []
-        for window in state.catalog.windows {
+        for window in windows {
             if let last = result.indices.last, result[last].name == window.appName {
                 result[last].windows.append(window)
             } else {

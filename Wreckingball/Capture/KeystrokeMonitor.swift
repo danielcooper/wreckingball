@@ -112,7 +112,10 @@ final class KeystrokeMonitor {
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return
         }
-        guard type == .keyDown,
+        // Keys typed into Wreckingball itself, such as the window search, are not part of the
+        // demo. Its own windows can never be presented, so nothing on the canvas is Wreckingball.
+        guard !NSApp.isActive,
+              type == .keyDown,
               event.getIntegerValueField(.keyboardEventAutorepeat) == 0,
               let nsEvent = NSEvent(cgEvent: event)
         else { return }
