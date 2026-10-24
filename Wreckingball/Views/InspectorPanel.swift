@@ -80,7 +80,8 @@ private struct CameraSettings: View {
 
         Form {
             Section {
-                Toggle("Show camera", isOn: $state.settings.cameraEnabled)
+                Toggle("Show when recording", isOn: $state.settings.cameraWhenRecording)
+                Toggle("Show when presenting", isOn: $state.settings.cameraWhenPresenting)
                 if !state.cameraDenied {
                     Picker("Camera", selection: $state.settings.cameraDeviceID) {
                         Text("System Default").tag(String?.none)
@@ -90,6 +91,8 @@ private struct CameraSettings: View {
             } footer: {
                 if state.cameraDenied {
                     Text("Camera access is off. Allow Wreckingball in System Settings → Privacy & Security → Camera.")
+                } else {
+                    Text("In a call your camera usually has a tile of its own, so presenting leaves it off.")
                 }
             }
 

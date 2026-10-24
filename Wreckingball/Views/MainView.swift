@@ -98,7 +98,7 @@ private struct CanvasPreview: View {
             }
         }
         let settings = state.settings
-        if settings.cameraEnabled {
+        if state.cameraVisible {
             let half = cameraHalfSize(in: size)
             let center = CGPoint(x: settings.cameraCenter.x * size.width, y: settings.cameraCenter.y * size.height)
             if abs(center.x - point.x) <= half.width, abs(center.y - point.y) <= half.height {

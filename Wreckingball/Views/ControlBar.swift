@@ -9,6 +9,22 @@ struct ControlBar: View {
         HStack(spacing: 14) {
             RecordButton()
 
+            // Like Keys, the icon carries the on/off state, since button highlights vanish
+            // whenever the window is in the background.
+            Button {
+                state.togglePresentation()
+            } label: {
+                Label {
+                    Text("Present")
+                } icon: {
+                    Image(systemName: "macwindow.on.rectangle")
+                        .foregroundStyle(state.isPresenting ? Color.accentColor : Color.secondary)
+                }
+            }
+            .disabled(state.isRecording || state.isFinishing)
+            .accessibilityValue(state.isPresenting ? "On" : "Off")
+            .help(presentHelp)
+
             Divider().frame(height: 22)
 
             Picker("Resolution", selection: $state.settings.resolution) {
@@ -45,7 +61,7 @@ struct ControlBar: View {
             Button {
                 state.toggleInspector(.camera)
             } label: {
-                Label("Camera", systemImage: state.settings.cameraEnabled ? "video.fill" : "video.slash")
+                Label("Camera", systemImage: state.cameraVisible ? "video.fill" : "video.slash")
             }
             .help("Camera settings")
 
@@ -70,6 +86,15 @@ struct ControlBar: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+    }
+
+    private var presentHelp: String {
+        if state.isRecording || state.isFinishing {
+            return "Stop recording to present"
+        }
+        return state.isPresenting
+            ? "Close the presentation window"
+            : "Open a window showing the canvas, to share in a call"
     }
 
     private var keysIcon: String {
@@ -101,8 +126,8 @@ private struct RecordButton: View {
                 .frame(minWidth: 78)
             }
             .controlSize(.large)
-            .disabled(state.isFinishing)
-            .help(state.isRecording ? "Stop recording" : "Start recording")
+            .disabled(state.isFinishing || state.isPresenting)
+            .help(recordHelp)
 
             if !state.isRecording, !state.isFinishing, state.lastRecording != nil {
                 Button {
@@ -113,6 +138,11 @@ private struct RecordButton: View {
                 .help("Show the last recording in Finder")
             }
         }
+    }
+
+    private var recordHelp: String {
+        if state.isPresenting { return "Close the presentation window to record" }
+        return state.isRecording ? "Stop recording" : "Start recording"
     }
 
     private static func elapsed(from start: Date, to now: Date) -> String {

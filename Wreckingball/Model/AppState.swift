@@ -12,11 +12,15 @@ final class AppState {
             guard settings != oldValue else { return }
             settings.save()
             engine.apply(settings)
-            if settings.cameraEnabled != oldValue.cameraEnabled || settings.cameraDeviceID != oldValue.cameraDeviceID {
+            if settings.cameraVisible(presenting: isPresenting) != oldValue.cameraVisible(presenting: isPresenting)
+                || settings.cameraDeviceID != oldValue.cameraDeviceID {
                 updateCamera()
             }
             if settings.micDeviceID != oldValue.micDeviceID {
                 updateMic()
+            }
+            if settings.resolution != oldValue.resolution {
+                presentation.setAspect(settings.canvasSize)
             }
             keystrokeMonitor.mode = settings.keystrokeMode
             if settings.keystrokesEnabled != oldValue.keystrokesEnabled {
@@ -39,6 +43,11 @@ final class AppState {
     }
     /// The keystroke panel is open: show a draggable sample pill on the canvas.
     var editingKeystrokes: Bool { inspector == .keystrokes }
+    /// The canvas is mirrored in its own window, ready to be shared in a call. Recording and
+    /// presenting are mutually exclusive, so the canvas only ever needs one camera setting.
+    private(set) var isPresenting = false
+    /// Whether the camera is on the canvas right now, which depends on the mode.
+    var cameraVisible: Bool { settings.cameraVisible(presenting: isPresenting) }
     private(set) var isFinishing = false
     private(set) var recordingStart: Date?
     private(set) var lastRecording: URL?
@@ -54,6 +63,7 @@ final class AppState {
 
     let catalog = WindowCatalog()
     @ObservationIgnored let engine = Engine()
+    @ObservationIgnored private let presentation = PresentationWindow()
     @ObservationIgnored private var levelTimer: Timer?
     @ObservationIgnored private lazy var keystrokeMonitor: KeystrokeMonitor = {
         let monitor = KeystrokeMonitor(display: engine.keystrokes)
@@ -74,6 +84,7 @@ final class AppState {
         pins = Pin.load()
         engine.apply(settings)
 
+        presentation.onClose = { [weak self] in self?.setPresenting(false) }
         catalog.onUpdate = { [weak self] in self?.catalogDidUpdate() }
         catalog.start()
         Hotkeys.register(self)
@@ -102,6 +113,26 @@ final class AppState {
         inspector = inspector == panel ? nil : panel
     }
 
+    /// Shows or hides the window that mirrors the canvas for screen sharing.
+    func togglePresentation() {
+        if presentation.isOpen {
+            presentation.close()
+        } else {
+            guard !isRecording, !isFinishing else { return }
+            presentation.show(layer: engine.presentationLayer, aspect: settings.canvasSize)
+        }
+        setPresenting(presentation.isOpen)
+    }
+
+    /// The camera setting that applies changes with the mode, so the canvas and the capture
+    /// session both need refreshing.
+    private func setPresenting(_ presenting: Bool) {
+        guard presenting != isPresenting else { return }
+        isPresenting = presenting
+        engine.setPresenting(presenting)
+        updateCamera()
+    }
+
     /// The sample pill is never shown while recording, so it can't end up in a video.
     private func updateKeystrokeSample() {
         engine.showKeystrokeSample.set(editingKeystrokes && !isRecording)
@@ -115,7 +146,7 @@ final class AppState {
     }
 
     private func updateCamera() {
-        if settings.cameraEnabled, !cameraDenied {
+        if cameraVisible, !cameraDenied {
             engine.camera.start(deviceID: settings.cameraDeviceID)
         } else {
             engine.camera.stop()
@@ -197,7 +228,13 @@ final class AppState {
         case .previousWindow:
             cycle(by: -1)
         case .toggleCamera:
-            settings.cameraEnabled.toggle()
+            // Toggles the setting for the mode you are in, so the shortcut always does something
+            // you can see.
+            if isPresenting {
+                settings.cameraWhenPresenting.toggle()
+            } else {
+                settings.cameraWhenRecording.toggle()
+            }
         case .toggleKeystrokes:
             settings.keystrokesEnabled.toggle()
         }
@@ -227,6 +264,10 @@ final class AppState {
         if isRecording {
             stopRecording()
         } else {
+            guard !isPresenting else {
+                errorMessage = "Wreckingball can record or present, not both. Close the presentation window first."
+                return
+            }
             startRecording()
         }
     }

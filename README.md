@@ -2,7 +2,7 @@
 
 A screen recorder for quick demos on macOS.
 
-OBS is great, but it's built for streaming. Wreckingball does one job: record a single window, framed over a nice background, with your camera in a corner, straight to an `.mp4` file. Keep it on a second screen and switch which window you're presenting with a click, a shortcut or a Stream Deck button, without stopping the recording.
+OBS is great, but it's built for streaming. Wreckingball does one job: record a single window, framed over a nice background, with your camera in a corner, straight to an `.mp4` file. Keep it on a second screen and switch which window you're presenting with a click, a shortcut or a Stream Deck button, without stopping the recording. The same framed canvas can go into a window you share live in a call.
 
 ![Wreckingball icon](Wreckingball/Media.xcassets/AppIcon.appiconset/icon_256.png)
 
@@ -12,8 +12,9 @@ OBS is great, but it's built for streaming. Wreckingball does one job: record a 
 - **Live window switching:** a window picker down the side, grouped by app, with up to nine pinned windows. It only lists windows that can actually be captured.
 - **Backgrounds:** gradient presets (including soft "aurora" styles), your own gradient colours, a flat colour, or an image (including your desktop picture) with blur and dim. Optional vignette and film grain.
 - **Framing:** padding, rounded corners and a shadow around the presented window.
-- **Camera overlay:** circle, squircle, rounded square, wide or hexagon. Drag it around the preview to place it.
+- **Camera overlay:** circle, squircle, rounded square, wide or hexagon. Drag it around the preview to place it, and show or hide it separately for recording and for presenting.
 - **Keystroke overlay:** shows the shortcuts you press, or everything you type, in a pill you can style and drag into place. Password fields are never shown.
+- **Presentation window:** mirror the canvas into a bare window you can share in Google Meet, Zoom or Slack.
 - **Microphone audio**, with an input picker and level meter.
 - **Remote control:** configurable global shortcuts and a `wreckingball://` URL scheme, both usable from a Stream Deck.
 
@@ -51,7 +52,9 @@ Because the builds aren't signed with a fixed identity, macOS may ask for Screen
 
 - **Choose a window** from the list on the right. Hover over a window and click the pin to give it a numbered slot.
 - **Background**, **Framing**, **Camera** and **Keys** in the bottom bar each open a settings panel over the window list. The preview stays uncovered, so you can drag the camera and the keystroke sample while you adjust them.
+- **Camera** has separate switches for recording and presenting. Presenting starts with the camera off, since in a call your camera usually has a tile of its own.
 - **Record** starts and stops recording. Recordings are saved to `~/Movies/Wreckingball` unless you change it in Settings.
+- **Present** opens a window showing the same framed canvas, for sharing live in a call. Pick **Wreckingball Presentation** from the call's window list. The window has no visible title bar or controls, so only the canvas is shared; its close and resize buttons appear when you move the pointer over it. Drag it anywhere, send it full screen, or leave it on a second display. Wreckingball records or presents, not both, so Record is unavailable while the window is open.
 
 ### Shortcuts and Stream Deck
 

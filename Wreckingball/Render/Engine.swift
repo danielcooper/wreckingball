@@ -6,7 +6,9 @@ import QuartzCore
 /// The frame pipeline: a fixed-rate clock composites the latest window and camera frames,
 /// then hands the result to the preview layer and the recorder.
 final class Engine: @unchecked Sendable {
-    let previewLayer = CALayer()
+    let previewLayer = Engine.makeOutputLayer()
+    /// Shows the same frames as the preview in the presentation window, which is shared in a call.
+    let presentationLayer = Engine.makeOutputLayer()
     let windowCapture: WindowCapture
     let camera: CameraCapture
     let mic = MicCapture()
@@ -20,6 +22,8 @@ final class Engine: @unchecked Sendable {
     private let windowFrame = Locked<CVPixelBuffer?>(nil)
     private let cameraFrame = Locked<CVPixelBuffer?>(nil)
     private let settings = Locked(CanvasSettings())
+    /// The presentation window is open, so the canvas follows the presenting camera setting.
+    private let presenting = Locked(false)
     private let compositor = Compositor()
     private let renderQueue = DispatchQueue(label: "coops.wreckingball.render", qos: .userInteractive)
 
@@ -30,10 +34,20 @@ final class Engine: @unchecked Sendable {
     init() {
         windowCapture = WindowCapture(frame: windowFrame)
         camera = CameraCapture(frame: cameraFrame)
-        previewLayer.contentsGravity = .resizeAspect
-        previewLayer.backgroundColor = CGColor(gray: 0, alpha: 1)
         let recorder = recorder
         mic.onSample.set { sample in recorder.appendAudio(sample) }
+    }
+
+    private static func makeOutputLayer() -> CALayer {
+        let layer = CALayer()
+        layer.contentsGravity = .resizeAspect
+        layer.backgroundColor = CGColor(gray: 0, alpha: 1)
+        return layer
+    }
+
+    /// Call on the main thread when the presentation window opens or closes.
+    func setPresenting(_ value: Bool) {
+        presenting.set(value)
     }
 
     /// Call on the main thread whenever settings change.
@@ -77,7 +91,7 @@ final class Engine: @unchecked Sendable {
         guard let buffer = compositor.render(
             settings: current,
             window: windowFrame.get(),
-            camera: current.cameraEnabled ? cameraFrame.get() : nil,
+            camera: current.cameraVisible(presenting: presenting.get()) ? cameraFrame.get() : nil,
             keystrokes: keystrokeOverlay(settings: current)
         ) else { return }
 
@@ -93,12 +107,14 @@ final class Engine: @unchecked Sendable {
 
         recorder.appendVideo(buffer, at: CMClockGetTime(CMClockGetHostTimeClock()))
 
-        let frame = Unchecked((layer: previewLayer, buffer: buffer))
+        let frame = Unchecked((layers: [previewLayer, presentationLayer], buffer: buffer))
         DispatchQueue.main.async {
             guard let surface = CVPixelBufferGetIOSurface(frame.value.buffer)?.takeUnretainedValue() else { return }
             CATransaction.begin()
             CATransaction.setDisableActions(true)
-            frame.value.layer.contents = surface
+            for layer in frame.value.layers {
+                layer.contents = surface
+            }
             CATransaction.commit()
         }
     }

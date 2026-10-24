@@ -51,7 +51,11 @@ struct CanvasSettings: Codable, Equatable, Sendable {
     var windowCornerRadius = 16.0
     var windowShadow = true
 
-    var cameraEnabled = true
+    /// Show the camera while recording, and while setting up.
+    var cameraWhenRecording = true
+    /// Show the camera in the presentation window. Off by default: in a call your camera is
+    /// usually already in a tile of its own.
+    var cameraWhenPresenting = false
     var cameraShape = CameraShape.circle
     /// Camera height as a fraction of canvas height.
     var cameraSize = 0.28
@@ -72,6 +76,12 @@ struct CanvasSettings: Codable, Equatable, Sendable {
     var keystrokeStyle = KeystrokeStyle()
 
     var canvasSize: CGSize { resolution.size }
+
+    /// Whether the camera belongs on the canvas. Recording and presenting are never both on, so
+    /// one composited canvas serves the recorder, the preview and the presentation window.
+    func cameraVisible(presenting: Bool) -> Bool {
+        presenting ? cameraWhenPresenting : cameraWhenRecording
+    }
 
     /// The largest area the presented window may occupy, in canvas pixels.
     var windowBox: CGSize {
@@ -113,6 +123,7 @@ enum KeystrokeMode: String, Codable, CaseIterable, Identifiable, Sendable {
 extension CanvasSettings {
     private enum LegacyKeys: String, CodingKey {
         case backgroundPath
+        case cameraEnabled
     }
 
     /// Fields missing from older saved settings keep their defaults instead of failing the whole decode.
@@ -137,7 +148,14 @@ extension CanvasSettings {
         windowPadding = value(.windowPadding, windowPadding)
         windowCornerRadius = value(.windowCornerRadius, windowCornerRadius)
         windowShadow = value(.windowShadow, windowShadow)
-        cameraEnabled = value(.cameraEnabled, cameraEnabled)
+        cameraWhenRecording = value(.cameraWhenRecording, cameraWhenRecording)
+        // Before presenting had its own setting, one switch covered the camera everywhere.
+        if !container.contains(.cameraWhenRecording),
+           let legacy = try? decoder.container(keyedBy: LegacyKeys.self),
+           let enabled = try? legacy.decodeIfPresent(Bool.self, forKey: .cameraEnabled) {
+            cameraWhenRecording = enabled
+        }
+        cameraWhenPresenting = value(.cameraWhenPresenting, cameraWhenPresenting)
         cameraShape = value(.cameraShape, cameraShape)
         cameraSize = value(.cameraSize, cameraSize)
         cameraCenter = value(.cameraCenter, cameraCenter)
