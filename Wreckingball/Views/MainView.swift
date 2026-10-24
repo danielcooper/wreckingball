@@ -60,7 +60,7 @@ private struct CanvasPreview: View {
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .overlay {
                 RoundedRectangle(cornerRadius: 6)
-                    .strokeBorder(state.isRecording ? Color.red : Color.primary.opacity(0.15), lineWidth: state.isRecording ? 2 : 1)
+                    .strokeBorder(borderColor, lineWidth: state.isRecording ? 2 : 1)
             }
             .overlay {
                 GeometryReader { geometry in
@@ -70,6 +70,12 @@ private struct CanvasPreview: View {
                 }
             }
             .shadow(color: .black.opacity(0.25), radius: 10, y: 4)
+    }
+
+    /// Red while recording, amber while paused, so a glance at a second screen tells you which.
+    private var borderColor: Color {
+        guard state.isRecording else { return Color.primary.opacity(0.15) }
+        return state.isPaused ? .orange : .red
     }
 
     private func dragGesture(in size: CGSize) -> some Gesture {

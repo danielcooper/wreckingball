@@ -49,7 +49,11 @@ final class AppState {
     /// Whether the camera is on the canvas right now, which depends on the mode.
     var cameraVisible: Bool { settings.cameraVisible(presenting: isPresenting) }
     private(set) var isFinishing = false
+    /// Recording is running but nothing is being written to the file.
+    private(set) var isPaused = false
     private(set) var recordingStart: Date?
+    @ObservationIgnored private var pausedTotal: TimeInterval = 0
+    @ObservationIgnored private var pausedSince: Date?
     private(set) var lastRecording: URL?
     var errorMessage: String?
 
@@ -272,6 +276,28 @@ final class AppState {
         }
     }
 
+    /// Pauses or resumes writing. The preview and the window being presented carry on as normal.
+    func togglePause() {
+        guard isRecording else { return }
+        if isPaused {
+            pausedTotal += Date().timeIntervalSince(pausedSince ?? Date())
+            pausedSince = nil
+            isPaused = false
+            engine.recorder.resume()
+        } else {
+            pausedSince = Date()
+            isPaused = true
+            engine.recorder.pause()
+        }
+    }
+
+    /// How much video is in the file so far, which excludes time spent paused.
+    func recordedSeconds(at now: Date) -> TimeInterval {
+        guard let recordingStart else { return 0 }
+        let paused = pausedTotal + (pausedSince.map { now.timeIntervalSince($0) } ?? 0)
+        return max(0, now.timeIntervalSince(recordingStart) - paused)
+    }
+
     private func startRecording() {
         do {
             let folder = outputFolder
@@ -285,6 +311,9 @@ final class AppState {
                 audioFormat: micDenied ? nil : engine.mic.format.get()
             )
             isRecording = true
+            isPaused = false
+            pausedTotal = 0
+            pausedSince = nil
             recordingStart = Date()
         } catch {
             errorMessage = "Could not start recording: \(error.localizedDescription)"
@@ -293,8 +322,10 @@ final class AppState {
 
     private func stopRecording() {
         isRecording = false
+        isPaused = false
         isFinishing = true
         recordingStart = nil
+        pausedSince = nil
         Task {
             let url = await engine.recorder.stop()
             isFinishing = false

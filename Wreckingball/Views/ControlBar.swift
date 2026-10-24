@@ -116,8 +116,9 @@ private struct RecordButton: View {
                         .foregroundStyle(.red)
                     if state.isRecording, let start = state.recordingStart {
                         TimelineView(.periodic(from: start, by: 1)) { context in
-                            Text(Self.elapsed(from: start, to: context.date))
+                            Text(Self.elapsed(state.recordedSeconds(at: context.date)))
                                 .monospacedDigit()
+                                .foregroundStyle(state.isPaused ? .secondary : .primary)
                         }
                     } else {
                         Text(state.isFinishing ? "Saving…" : "Record")
@@ -128,6 +129,18 @@ private struct RecordButton: View {
             .controlSize(.large)
             .disabled(state.isFinishing || state.isPresenting)
             .help(recordHelp)
+
+            if state.isRecording {
+                Button {
+                    state.togglePause()
+                } label: {
+                    Image(systemName: state.isPaused ? "play.fill" : "pause.fill")
+                        .frame(minWidth: 12)
+                }
+                .controlSize(.large)
+                .help(pauseHelp)
+                .accessibilityLabel(pauseHelp)
+            }
 
             if !state.isRecording, !state.isFinishing, state.lastRecording != nil {
                 Button {
@@ -140,13 +153,17 @@ private struct RecordButton: View {
         }
     }
 
+    private var pauseHelp: String {
+        state.isPaused ? "Resume recording" : "Pause recording"
+    }
+
     private var recordHelp: String {
         if state.isPresenting { return "Close the presentation window to record" }
         return state.isRecording ? "Stop recording" : "Start recording"
     }
 
-    private static func elapsed(from start: Date, to now: Date) -> String {
-        let seconds = max(0, Int(now.timeIntervalSince(start)))
+    private static func elapsed(_ duration: TimeInterval) -> String {
+        let seconds = max(0, Int(duration))
         return String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
 }

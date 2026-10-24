@@ -9,6 +9,7 @@ OBS is great, but it's built for streaming. Wreckingball does one job: record a 
 ## Features
 
 - **Fixed output size:** 720p, 1080p, 1440p or 4K at 30 or 60 fps, saved as H.264 or HEVC `.mp4`.
+- **Pause and resume** mid-recording, without a gap or a drift in the finished file.
 - **Live window switching:** a window picker down the side, grouped by app, with up to nine pinned windows. It only lists windows that can actually be captured.
 - **Backgrounds:** gradient presets (including soft "aurora" styles), your own gradient colours, a flat colour, or an image (including your desktop picture) with blur and dim. Optional vignette and film grain.
 - **Framing:** padding, rounded corners and a shadow around the presented window.
@@ -54,6 +55,7 @@ Because the builds aren't signed with a fixed identity, macOS may ask for Screen
 - **Background**, **Framing**, **Camera** and **Keys** in the bottom bar each open a settings panel over the window list. The preview stays uncovered, so you can drag the camera and the keystroke sample while you adjust them.
 - **Camera** has separate switches for recording and presenting. Presenting starts with the camera off, since in a call your camera usually has a tile of its own.
 - **Record** starts and stops recording. Recordings are saved to `~/Movies/Wreckingball` unless you change it in Settings.
+- **Pause**, next to the timer while recording, stops writing without closing the file; press it again to carry on. The timer counts only what's in the file, and the border around the preview turns amber so a glance at a second screen tells you it's paused. The preview and the window you're presenting carry on as normal while paused.
 - **Present** opens a window showing the same framed canvas, for sharing live in a call. Pick **Wreckingball Presentation** from the call's window list. The window has no visible title bar or controls, so only the canvas is shared; its close and resize buttons appear when you move the pointer over it. Drag it anywhere, send it full screen, or leave it on a second display. Wreckingball records or presents, not both, so Record is unavailable while the window is open.
 
 ### Shortcuts and Stream Deck

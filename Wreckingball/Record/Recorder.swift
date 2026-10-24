@@ -11,6 +11,12 @@ final class Recorder: @unchecked Sendable {
     private var adaptor: AVAssetWriterInputPixelBufferAdaptor?
     private var sessionStart: CMTime?
     private var droppedFrames = 0
+    /// Host time the recording was paused at, or nil when running.
+    private var pausedAt: CMTime?
+    /// Total time spent paused, subtracted from every timestamp so the file has no gap.
+    private var pauseOffset = CMTime.zero
+    /// End of the last audio written, to keep the track monotonic across a pause.
+    private var lastAudioEnd = CMTime.negativeInfinity
 
     func start(url: URL, settings: CanvasSettings, audioFormat: CMFormatDescription?) throws {
         let size = settings.canvasSize
@@ -74,13 +80,33 @@ final class Recorder: @unchecked Sendable {
         self.adaptor = adaptor
         sessionStart = nil
         droppedFrames = 0
+        pausedAt = nil
+        pauseOffset = .zero
+        lastAudioEnd = .negativeInfinity
         lock.unlock()
+    }
+
+    /// Stops writing without closing the file. Frames keep being composited for the preview.
+    func pause() {
+        lock.lock()
+        defer { lock.unlock() }
+        guard writer != nil, pausedAt == nil else { return }
+        pausedAt = CMClockGetTime(CMClockGetHostTimeClock())
+    }
+
+    func resume() {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let pausedAt else { return }
+        pauseOffset = pauseOffset + (CMClockGetTime(CMClockGetHostTimeClock()) - pausedAt)
+        self.pausedAt = nil
     }
 
     func appendVideo(_ buffer: CVPixelBuffer, at time: CMTime) {
         lock.lock()
         defer { lock.unlock() }
-        guard let writer, let videoInput, let adaptor, writer.status == .writing else { return }
+        guard let writer, let videoInput, let adaptor, writer.status == .writing, pausedAt == nil else { return }
+        let time = time - pauseOffset
         if sessionStart == nil {
             writer.startSession(atSourceTime: time)
             sessionStart = time
@@ -97,11 +123,27 @@ final class Recorder: @unchecked Sendable {
     func appendAudio(_ sample: CMSampleBuffer) {
         lock.lock()
         defer { lock.unlock() }
-        guard let writer, let audioInput, let sessionStart, writer.status == .writing,
-              sample.presentationTimeStamp >= sessionStart,
+        guard let writer, let audioInput, let sessionStart, writer.status == .writing, pausedAt == nil,
               audioInput.isReadyForMoreMediaData
         else { return }
-        audioInput.append(sample)
+        let start = sample.presentationTimeStamp - pauseOffset
+        // Samples captured before a pause can arrive after it; they would land in time already written.
+        guard start >= sessionStart, start >= lastAudioEnd else { return }
+        guard pauseOffset != .zero else {
+            audioInput.append(sample)
+            lastAudioEnd = start + sample.duration
+            return
+        }
+        guard var timings = try? sample.sampleTimingInfos() else { return }
+        for index in timings.indices {
+            timings[index].presentationTimeStamp = timings[index].presentationTimeStamp - pauseOffset
+            if timings[index].decodeTimeStamp.isValid {
+                timings[index].decodeTimeStamp = timings[index].decodeTimeStamp - pauseOffset
+            }
+        }
+        guard let shifted = try? CMSampleBuffer(copying: sample, withNewTiming: timings) else { return }
+        audioInput.append(shifted)
+        lastAudioEnd = start + sample.duration
     }
 
     /// Finishes the file and returns its URL, or nil if nothing was written.
@@ -138,6 +180,9 @@ final class Recorder: @unchecked Sendable {
         audioInput = nil
         adaptor = nil
         sessionStart = nil
+        pausedAt = nil
+        pauseOffset = .zero
+        lastAudioEnd = .negativeInfinity
         return result
     }
 }
