@@ -4,6 +4,7 @@ import KeyboardShortcuts
 /// Global shortcuts. None are bound by default; the user sets them in Settings.
 extension KeyboardShortcuts.Name {
     static let toggleRecording = Self("toggleRecording")
+    static let togglePause = Self("togglePause")
     static let nextWindow = Self("nextWindow")
     static let previousWindow = Self("previousWindow")
     static let toggleCamera = Self("toggleCamera")
@@ -15,6 +16,7 @@ extension KeyboardShortcuts.Name {
 enum Hotkeys {
     static func register(_ state: AppState) {
         bind(.toggleRecording, to: .toggleRecording, state)
+        bind(.togglePause, to: .togglePause, state)
         bind(.nextWindow, to: .nextWindow, state)
         bind(.previousWindow, to: .previousWindow, state)
         bind(.toggleCamera, to: .toggleCamera, state)
@@ -25,7 +27,8 @@ enum Hotkeys {
     }
 
     static let all: [KeyboardShortcuts.Name] =
-        [.toggleRecording, .nextWindow, .previousWindow, .toggleCamera, .toggleKeystrokes] + KeyboardShortcuts.Name.pinSlots
+        [.toggleRecording, .togglePause, .nextWindow, .previousWindow, .toggleCamera, .toggleKeystrokes]
+        + KeyboardShortcuts.Name.pinSlots
 
     /// True when a key press is one of Wreckingball's own shortcuts, which the keystroke overlay hides.
     static func isOwnShortcut(keyCode: CGKeyCode, modifiers: NSEvent.ModifierFlags) -> Bool {

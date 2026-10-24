@@ -5,6 +5,9 @@ enum Command: Equatable, Sendable {
     case toggleRecording
     case startRecording
     case stopRecording
+    case togglePause
+    case pauseRecording
+    case resumeRecording
     case pin(Int)
     case nextWindow
     case previousWindow
@@ -26,6 +29,9 @@ enum Command: Equatable, Sendable {
         case ("record", "toggle"), ("record", nil): self = .toggleRecording
         case ("record", "start"): self = .startRecording
         case ("record", "stop"): self = .stopRecording
+        case ("record", "pause"): self = .pauseRecording
+        case ("record", "resume"): self = .resumeRecording
+        case ("pause", "toggle"), ("pause", nil): self = .togglePause
         case ("window", "next"): self = .nextWindow
         case ("window", "previous"), ("window", "prev"): self = .previousWindow
         case ("camera", "toggle"), ("camera", nil): self = .toggleCamera
@@ -42,6 +48,9 @@ enum Command: Equatable, Sendable {
         ("wreckingball://record/toggle", "Start or stop recording"),
         ("wreckingball://record/start", "Start recording"),
         ("wreckingball://record/stop", "Stop recording"),
+        ("wreckingball://pause/toggle", "Pause or resume recording"),
+        ("wreckingball://record/pause", "Pause recording"),
+        ("wreckingball://record/resume", "Resume recording"),
         ("wreckingball://pin/1", "Present pinned window 1 (up to 9)"),
         ("wreckingball://window/next", "Present the next window"),
         ("wreckingball://window/previous", "Present the previous window"),

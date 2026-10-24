@@ -222,6 +222,12 @@ final class AppState {
             if !isRecording { toggleRecording() }
         case .stopRecording:
             if isRecording { toggleRecording() }
+        case .togglePause:
+            togglePause()
+        case .pauseRecording:
+            if !isPaused { togglePause() }
+        case .resumeRecording:
+            if isPaused { togglePause() }
         case .pin(let slot):
             guard pins.indices.contains(slot - 1),
                   let window = pins[slot - 1].resolve(in: catalog.windows)

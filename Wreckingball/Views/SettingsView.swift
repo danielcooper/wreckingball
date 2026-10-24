@@ -46,6 +46,7 @@ private struct ShortcutSettings: View {
         Form {
             Section {
                 KeyboardShortcuts.Recorder("Start or stop recording", name: .toggleRecording)
+                KeyboardShortcuts.Recorder("Pause or resume recording", name: .togglePause)
                 KeyboardShortcuts.Recorder("Next window", name: .nextWindow)
                 KeyboardShortcuts.Recorder("Previous window", name: .previousWindow)
                 KeyboardShortcuts.Recorder("Show or hide camera", name: .toggleCamera)

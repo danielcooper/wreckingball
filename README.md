@@ -60,7 +60,7 @@ Because the builds aren't signed with a fixed identity, macOS may ask for Screen
 
 ### Shortcuts and Stream Deck
 
-No shortcuts are set by default. Set them in **Settings → Shortcuts** for recording, next and previous window, pinned windows 1–9, the camera and the keystroke overlay. A Stream Deck **Hotkey** action can then press them.
+No shortcuts are set by default. Set them in **Settings → Shortcuts** for recording, pausing, next and previous window, pinned windows 1–9, the camera and the keystroke overlay. A Stream Deck **Hotkey** action can then press them.
 
 URL commands also work. Use `open -g` so the app you're presenting keeps focus:
 
@@ -69,6 +69,9 @@ URL commands also work. Use `open -g` so the app you're presenting keeps focus:
 | `wreckingball://record/toggle` | Start or stop recording |
 | `wreckingball://record/start` | Start recording |
 | `wreckingball://record/stop` | Stop recording |
+| `wreckingball://pause/toggle` | Pause or resume recording |
+| `wreckingball://record/pause` | Pause recording |
+| `wreckingball://record/resume` | Resume recording |
 | `wreckingball://pin/<n>` | Present pinned window `n` (1–9) |
 | `wreckingball://window/next` | Present the next window |
 | `wreckingball://window/previous` | Present the previous window |
