@@ -3,6 +3,14 @@
 Notable changes to Wreckingball. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and version numbers follow [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-11-25
+
+### Added
+
+- **Whole desktops as a source.** A Displays section at the bottom of the window list presents a
+  complete display rather than a single window, for demos that move between apps. Wreckingball
+  excludes itself from the capture, so the canvas can't end up showing itself.
+
 ## [0.2.0] — 2026-10-24
 
 ### Added
@@ -38,5 +46,6 @@ First release: record a single window framed over a background, with a camera ov
 overlay and microphone audio, straight to an `.mp4`. Live window switching with pinned windows,
 global shortcuts and a `wreckingball://` URL scheme for Stream Deck control.
 
+[0.3.0]: https://github.com/danielcooper/wreckingball/releases/tag/v0.3.0
 [0.2.0]: https://github.com/danielcooper/wreckingball/releases/tag/v0.2.0
 [0.1.0]: https://github.com/danielcooper/wreckingball/releases/tag/v0.1.0
