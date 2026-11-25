@@ -3,8 +3,8 @@ import CoreVideo
 import Foundation
 @preconcurrency import ScreenCaptureKit
 
-/// Owns the single `SCStream` for the presented window. Switching windows swaps the
-/// stream's content filter, so there is no gap while recording.
+/// Owns the single `SCStream` for whatever is being presented, a window or a whole desktop.
+/// Switching swaps the stream's content filter, so there is no gap while recording.
 final class WindowCapture: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
     private struct State {
         var targetBox = CGSize(width: 1920, height: 1080)
@@ -33,8 +33,14 @@ final class WindowCapture: NSObject, SCStreamOutput, SCStreamDelegate, @unchecke
 
     /// Presents `window`, or stops capturing when nil.
     func show(_ window: SCWindow?) {
-        let boxed = Unchecked(window)
-        enqueue { await self.apply(window: boxed.value) }
+        let boxed = Unchecked(window.map { SCContentFilter(desktopIndependentWindow: $0) })
+        enqueue { await self.apply(filter: boxed.value) }
+    }
+
+    /// Presents a whole desktop. Wreckingball is left out of it, so the canvas can't show itself.
+    func show(display: SCDisplay, excluding: [SCRunningApplication]) {
+        let boxed = Unchecked(SCContentFilter(display: display, excludingApplications: excluding, exceptingWindows: []))
+        enqueue { await self.apply(filter: boxed.value) }
     }
 
     func updateTarget(box: CGSize, fps: Int) {
@@ -61,12 +67,11 @@ final class WindowCapture: NSObject, SCStreamOutput, SCStreamDelegate, @unchecke
         }
     }
 
-    private func apply(window: SCWindow?) async {
-        guard let window else {
+    private func apply(filter newFilter: SCContentFilter?) async {
+        guard let newFilter else {
             await stop()
             return
         }
-        let newFilter = SCContentFilter(desktopIndependentWindow: window)
         let scale = CGFloat(newFilter.pointPixelScale)
         let native = CGSize(width: newFilter.contentRect.width * scale, height: newFilter.contentRect.height * scale)
         state.withLock { state in
@@ -88,7 +93,7 @@ final class WindowCapture: NSObject, SCStreamOutput, SCStreamDelegate, @unchecke
             filter = newFilter
             clearIfNoFrameArrives()
         } catch {
-            Log.capture.error("Window capture failed: \(error.localizedDescription)")
+            Log.capture.error("Capture failed: \(error.localizedDescription)")
             await stop()
         }
     }

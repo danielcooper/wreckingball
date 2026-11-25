@@ -19,18 +19,18 @@ struct WindowPickerView: View {
             }
             .padding(.horizontal, 12)
             .padding(.top, 10)
-            .padding(.bottom, hasWindows ? 8 : 10)
+            .padding(.bottom, hasSources ? 8 : 10)
 
-            if hasWindows {
+            if hasSources {
                 searchField
             }
             Divider()
 
             if state.catalog.permissionDenied {
                 PermissionNotice()
-            } else if state.catalog.windows.isEmpty {
+            } else if !hasSources {
                 ContentUnavailableView("No windows", systemImage: "macwindow", description: Text("Open a window to present it."))
-            } else if matches.isEmpty {
+            } else if matches.isEmpty, matchingDisplays.isEmpty {
                 // ContentUnavailableView is sized for a whole window; in a column this narrow it
                 // ends up floating in the middle, so the message sits where the list would start.
                 Text("No windows match “\(query)”.")
@@ -50,6 +50,7 @@ struct WindowPickerView: View {
                                 WindowRow(window: window, slot: nil)
                             }
                         }
+                        displaysSection
                     }
                     .padding(12)
                 }
@@ -58,8 +59,26 @@ struct WindowPickerView: View {
         .background(.background.secondary)
     }
 
-    private var hasWindows: Bool {
-        !state.catalog.permissionDenied && !state.catalog.windows.isEmpty
+    private var hasSources: Bool {
+        !state.catalog.permissionDenied && !(state.catalog.windows.isEmpty && state.catalog.displays.isEmpty)
+    }
+
+    /// Whole desktops, below the windows: the thing to reach for when a demo spans several apps.
+    @ViewBuilder
+    private var displaysSection: some View {
+        if !matchingDisplays.isEmpty {
+            if !matches.isEmpty {
+                Divider()
+                    .padding(.vertical, 4)
+            }
+            Label("Displays", systemImage: "display")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.top, 4)
+            ForEach(matchingDisplays) { display in
+                DisplayRow(display: display)
+            }
+        }
     }
 
     private var searchField: some View {
@@ -102,9 +121,21 @@ struct WindowPickerView: View {
         let terms = query.split(whereSeparator: \.isWhitespace)
         guard !terms.isEmpty else { return state.catalog.windows }
         return state.catalog.windows.filter { window in
-            let text = "\(window.appName) \(window.title)"
-            return terms.allSatisfy { text.localizedStandardContains($0) }
+            matches(terms, in: "\(window.appName) \(window.title)")
         }
+    }
+
+    /// Displays answer to their name and to the words someone is likely to type looking for one.
+    private var matchingDisplays: [DisplayInfo] {
+        let terms = query.split(whereSeparator: \.isWhitespace)
+        guard !terms.isEmpty else { return state.catalog.displays }
+        return state.catalog.displays.filter { display in
+            matches(terms, in: "\(display.name) display desktop screen")
+        }
+    }
+
+    private func matches(_ terms: [Substring], in text: String) -> Bool {
+        terms.allSatisfy { text.localizedStandardContains($0) }
     }
 
     /// Hidden while searching: the matches are the whole point of the list then.
@@ -234,6 +265,63 @@ private struct WindowRow: View {
                 .aspectRatio(contentMode: .fit)
         } else {
             Image(systemName: "macwindow")
+                .font(.largeTitle)
+                .foregroundStyle(.tertiary)
+        }
+    }
+}
+
+/// A whole desktop. Like a window tile, without pinning: pins match on app and title.
+private struct DisplayRow: View {
+    @Environment(AppState.self) private var state
+    let display: DisplayInfo
+    @State private var hovering = false
+
+    var body: some View {
+        let isLive = state.selectedDisplayID == display.id
+
+        Button {
+            state.select(display: display)
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                thumbnail
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 120)
+                    .background(.black.opacity(0.25))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay(alignment: .topLeading) {
+                        if isLive {
+                            Badge(text: "LIVE", color: .red)
+                                .padding(6)
+                        }
+                    }
+                Text(display.name)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .padding(6)
+            .background(isLive ? Color.accentColor.opacity(0.18) : hovering ? Color.primary.opacity(0.06) : .clear)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(isLive ? Color.accentColor : .clear, lineWidth: 2)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("\(display.name) — \(Int(display.size.width)) × \(Int(display.size.height))")
+    }
+
+    @ViewBuilder
+    private var thumbnail: some View {
+        if let image = state.catalog.displayThumbnails[display.id] {
+            Image(nsImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+        } else {
+            Image(systemName: "display")
                 .font(.largeTitle)
                 .foregroundStyle(.tertiary)
         }

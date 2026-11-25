@@ -33,7 +33,10 @@ final class AppState {
         didSet { Pin.save(pins) }
     }
 
-    private(set) var selectedWindowID: CGWindowID?
+    /// What is on the canvas: a window, a whole desktop, or just the background.
+    private(set) var presented = Presented.nothing
+    var selectedWindowID: CGWindowID? { if case .window(let id) = presented { id } else { nil } }
+    var selectedDisplayID: CGDirectDisplayID? { if case .display(let id) = presented { id } else { nil } }
     private(set) var isRecording = false {
         didSet { updateKeystrokeSample() }
     }
@@ -165,11 +168,17 @@ final class AppState {
     // MARK: Window selection
 
     func select(_ window: WindowInfo?, activate: Bool = true) {
-        selectedWindowID = window?.id
+        presented = window.map { Presented.window($0.id) } ?? .nothing
         engine.windowCapture.show(window?.window)
         if let window, activate, settings.activateOnSwitch {
             NSRunningApplication(processIdentifier: window.pid)?.activate()
         }
+    }
+
+    /// Presents a whole desktop. Nothing is brought to the front: the desktop is already there.
+    func select(display: DisplayInfo) {
+        presented = .display(display.id)
+        engine.windowCapture.show(display: display.display, excluding: display.excluding)
     }
 
     func isPinned(_ window: WindowInfo) -> Bool {
@@ -206,8 +215,11 @@ final class AppState {
     }
 
     private func catalogDidUpdate() {
-        // The presented window was closed: fall back to the background.
-        if let selectedWindowID, catalog.window(id: selectedWindowID) == nil, !catalog.permissionDenied {
+        guard !catalog.permissionDenied else { return }
+        // The presented window was closed, or the display was unplugged: fall back to the background.
+        if let selectedWindowID, catalog.window(id: selectedWindowID) == nil {
+            select(nil)
+        } else if let selectedDisplayID, catalog.display(id: selectedDisplayID) == nil {
             select(nil)
         }
     }

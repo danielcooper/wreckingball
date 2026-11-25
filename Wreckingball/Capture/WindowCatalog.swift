@@ -11,18 +11,31 @@ struct WindowInfo: Identifiable {
     let window: SCWindow
 }
 
+/// A whole desktop that can be presented, one per connected display.
+struct DisplayInfo: Identifiable {
+    let id: CGDirectDisplayID
+    let name: String
+    let size: CGSize
+    let display: SCDisplay
+    /// Wreckingball itself, kept out of the capture so presenting a desktop can't mirror it.
+    let excluding: [SCRunningApplication]
+}
+
 /// Polls ScreenCaptureKit for windows that can be presented. A window is only listed once a
 /// test capture of it has produced a non-blank image, so every tile in the picker works.
 @MainActor
 @Observable
 final class WindowCatalog {
     private(set) var windows: [WindowInfo] = []
+    private(set) var displays: [DisplayInfo] = []
     private(set) var thumbnails: [CGWindowID: NSImage] = [:]
+    private(set) var displayThumbnails: [CGDirectDisplayID: NSImage] = [:]
     private(set) var permissionDenied = false
 
     @ObservationIgnored var onUpdate: (() -> Void)?
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var lastAttempt: [CGWindowID: Date] = [:]
+    @ObservationIgnored private var displayLastAttempt: [CGDirectDisplayID: Date] = [:]
     @ObservationIgnored private var failures: [CGWindowID: Int] = [:]
     @ObservationIgnored private var requestedAccess = false
 
@@ -63,6 +76,11 @@ final class WindowCatalog {
         return windows.first { $0.id == id }
     }
 
+    func display(id: CGDirectDisplayID?) -> DisplayInfo? {
+        guard let id else { return nil }
+        return displays.first { $0.id == id }
+    }
+
     private func refresh() async {
         // Every ScreenCaptureKit call made without access re-shows the system prompt, so check
         // quietly first and ask at most once per launch.
@@ -72,6 +90,7 @@ final class WindowCatalog {
                 CGRequestScreenCaptureAccess()
             }
             windows = []
+            displays = []
             permissionDenied = true
             onUpdate?()
             return
@@ -79,14 +98,18 @@ final class WindowCatalog {
 
         let candidates: [WindowInfo]
         do {
-            candidates = try await fetchCandidates()
+            let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
+            candidates = windowCandidates(in: content)
+            displays = desktops(in: content)
             permissionDenied = false
         } catch {
             Log.capture.error("Listing windows failed: \(error.localizedDescription)")
             windows = []
+            displays = []
             onUpdate?()
             return
         }
+        await refreshDisplayThumbnails()
 
         let candidateIDs = Set(candidates.map(\.id))
         thumbnails = thumbnails.filter { candidateIDs.contains($0.key) }
@@ -115,9 +138,57 @@ final class WindowCatalog {
         onUpdate?()
     }
 
-    private func fetchCandidates() async throws -> [WindowInfo] {
+    /// One entry per connected display, named the way System Settings names it.
+    private func desktops(in content: SCShareableContent) -> [DisplayInfo] {
+        let ownBundleID = Bundle.main.bundleIdentifier
+        let own = content.applications.filter { $0.bundleIdentifier == ownBundleID }
+        let screens = NSScreen.screens
+        return content.displays.map { display in
+            let screen = screens.first {
+                ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID) == display.displayID
+            }
+            // SCDisplay reports points; the screen knows how many pixels that is.
+            let pixels = screen.map {
+                CGSize(width: $0.frame.width * $0.backingScaleFactor, height: $0.frame.height * $0.backingScaleFactor)
+            }
+            return DisplayInfo(
+                id: display.displayID,
+                name: screen?.localizedName ?? "Display",
+                size: pixels ?? CGSize(width: display.width, height: display.height),
+                display: display,
+                excluding: own
+            )
+        }
+    }
+
+    private func refreshDisplayThumbnails() async {
+        let now = Date()
+        displayThumbnails = displayThumbnails.filter { id, _ in displays.contains { $0.id == id } }
+        displayLastAttempt = displayLastAttempt.filter { id, _ in displays.contains { $0.id == id } }
+        for info in displays {
+            if Task.isCancelled { return }
+            if let last = displayLastAttempt[info.id], now.timeIntervalSince(last) < Self.thumbnailInterval { continue }
+            displayLastAttempt[info.id] = now
+            if let image = await capture(info) {
+                displayThumbnails[info.id] = image
+            }
+        }
+    }
+
+    /// Captures a small image of a desktop, with Wreckingball left out of it.
+    private func capture(_ info: DisplayInfo) async -> NSImage? {
+        let configuration = SCStreamConfiguration()
+        configuration.width = 360
+        configuration.height = max(2, Int(360 * info.size.height / max(1, info.size.width)))
+        configuration.showsCursor = false
+        let filter = SCContentFilter(display: info.display, excludingApplications: info.excluding, exceptingWindows: [])
+        guard let image = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
+        else { return nil }
+        return NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+    }
+
+    private func windowCandidates(in content: SCShareableContent) -> [WindowInfo] {
         // On-screen only: minimised windows, hidden apps and other Spaces deliver no frames.
-        let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
         let ownBundleID = Bundle.main.bundleIdentifier
         let found = content.windows.compactMap { window -> WindowInfo? in
             guard window.windowLayer == 0,

@@ -38,6 +38,13 @@ enum VideoCodec: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// What the canvas is showing.
+enum Presented: Equatable, Sendable {
+    case nothing
+    case window(CGWindowID)
+    case display(CGDirectDisplayID)
+}
+
 struct CanvasSettings: Codable, Equatable, Sendable {
     var resolution = Resolution.hd1080
     var fps = 30

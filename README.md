@@ -11,6 +11,7 @@ OBS is great, but it's built for streaming. Wreckingball does one job: record a 
 - **Fixed output size:** 720p, 1080p, 1440p or 4K at 30 or 60 fps, saved as H.264 or HEVC `.mp4`.
 - **Pause and resume** mid-recording, without a gap or a drift in the finished file.
 - **Live window switching:** a window picker down the side, grouped by app, with up to nine pinned windows and a search box for when there are a lot of them. It only lists windows that can actually be captured.
+- **Whole desktops:** present a complete display instead of a single window, for demos that span several apps. Wreckingball leaves itself out of the capture.
 - **Backgrounds:** gradient presets (including soft "aurora" styles), your own gradient colours, a flat colour, or an image (including your desktop picture) with blur and dim. Optional vignette and film grain.
 - **Framing:** padding, rounded corners and a shadow around the presented window.
 - **Camera overlay:** circle, squircle, rounded square, wide or hexagon. Drag it around the preview to place it, and show or hide it separately for recording and for presenting.
@@ -52,6 +53,7 @@ Because the builds aren't signed with a fixed identity, macOS may ask for Screen
 ## Using it
 
 - **Choose a window** from the list on the right. Hover over a window and click the pin to give it a numbered slot.
+- **Displays**, at the bottom of the list, present a whole desktop rather than one window. Wreckingball's own windows are left out of it, so the canvas never shows itself. Displays can't be pinned, since pins match on app and window title.
 - **Search** above the list filters by app name and window title. Every word has to match, so "chrome git" narrows to the Chrome window with the repo open, and Return presents the first match.
 - **Background**, **Framing**, **Camera** and **Keys** in the bottom bar each open a settings panel over the window list. The preview stays uncovered, so you can drag the camera and the keystroke sample while you adjust them.
 - **Camera** has separate switches for recording and presenting. Presenting starts with the camera off, since in a call your camera usually has a tile of its own.
